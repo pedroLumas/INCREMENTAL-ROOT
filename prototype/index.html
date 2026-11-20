@@ -1,0 +1,664 @@
+<meta charset="utf-8">
+<title>Vaciar el Vesubio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Rubik:wght@400;500;700&display=swap">
+<style>
+  /* Layout: una columna en móvil; en escritorio, escena + cuchara a la izquierda y mejoras a la derecha. */
+  :root {
+    color-scheme: dark;
+    --night: #1c1521;      /* fondo: noche volcánica, ciruela muy oscuro */
+    --panel: #271e2c;      /* superficies */
+    --line: #3d3142;       /* bordes */
+    --rock: #5a4a52;       /* roca del volcán */
+    --ash: #b8aab0;        /* texto secundario */
+    --bone: #f4e9dd;       /* texto */
+    --magma: #ff7b1c;      /* acento: magma */
+    --magma-deep: #b8420c; /* sombra dura de botones */
+    --ember: #ffc15c;      /* brillo */
+    --obsidian: #120d16;   /* montaña de magma enfriado */
+    --good: #8fd694;
+    --warn: #ff9f6b;
+    --font-display: "Pixelify Sans", "Courier New", monospace;
+    --font-body: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--night); color: var(--bone); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+  .app {
+    max-width: 1120px; margin: 0 auto;
+    padding-block: 16px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 880px) { .app { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; } }
+  .col { display: grid; gap: 14px; min-width: 0; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.6rem, 5vw, 2.2rem); line-height: 1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+  h1 small { display: block; font-size: .5em; color: var(--magma); font-weight: 600; margin-top: 6px; }
+  .legacy { font-family: var(--font-display); color: var(--ash); font-size: .95rem; text-align: right; }
+  .legacy b { color: var(--ember); font-weight: 600; }
+
+  .counter { display: grid; gap: 2px; }
+  .label { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ash); }
+  .big { font-family: var(--font-display); font-size: clamp(1.25rem, 5.4vw, 2rem); line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; color: var(--bone); }
+
+  .scene-wrap { position: relative; border: 2px solid var(--line); background: var(--obsidian); }
+  canvas#scene { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; touch-action: manipulation; }
+  .scene-wrap.shake { animation: shake .45s linear; }
+  @keyframes shake { 0%,100% { transform: translate(0,0) } 20% { transform: translate(-4px,2px) } 40% { transform: translate(4px,-3px) } 60% { transform: translate(-3px,-2px) } 80% { transform: translate(3px,2px) } }
+  .scene-caption { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: .8rem; color: var(--ash); }
+
+  .race { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+  .race span { white-space: nowrap; }
+  .chip { font-family: var(--font-display); font-size: .85rem; padding: 2px 8px; border: 2px solid currentColor; }
+  .chip.down { color: var(--good); } .chip.eq { color: var(--ash); } .chip.up { color: var(--warn); }
+
+  button { font: inherit; color: inherit; }
+  .scoop {
+    position: relative; width: 100%; border: 0; cursor: pointer; touch-action: manipulation;
+    background: var(--magma); color: var(--obsidian);
+    font-family: var(--font-display); font-weight: 700; font-size: 1.35rem;
+    padding: 18px 16px; box-shadow: 0 6px 0 var(--magma-deep); transform: translateY(0);
+    transition: transform .05s, box-shadow .05s; user-select: none; -webkit-user-select: none; overflow: hidden;
+  }
+  .scoop:active { transform: translateY(6px); box-shadow: 0 0 0 var(--magma-deep); }
+  .scoop .sub { display: block; font-family: var(--font-body); font-weight: 500; font-size: .8rem; opacity: .8; margin-top: 2px; }
+  .float { position: absolute; left: 50%; top: 55%; pointer-events: none; font-family: var(--font-display); color: var(--ember); font-size: .95rem; animation: rise .9s ease-out forwards; white-space: nowrap; }
+  @keyframes rise { from { opacity: 1; transform: translate(-50%, 0) } to { opacity: 0; transform: translate(-50%, -40px) } }
+  @media (hover: none) { .keyhint { display: none; } }
+  :focus-visible { outline: 3px solid var(--ember); outline-offset: 2px; }
+
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 14px; background: var(--panel); border: 2px solid var(--line); }
+  .stat { display: grid; gap: 1px; min-width: 0; }
+  .stat .v { font-family: var(--font-display); font-size: 1.05rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .stat .v.hot { color: var(--ember); }
+
+  .section-title { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; margin: 4px 0 0; }
+  .upgrades { display: grid; gap: 8px; }
+  .up {
+    --p: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; text-align: left;
+    padding: 12px 14px; border: 2px solid var(--line); cursor: pointer;
+    background: linear-gradient(90deg, rgba(255,123,28,.16) calc(var(--p) * 100%), var(--panel) 0);
+  }
+  .up:disabled { cursor: not-allowed; }
+  .up:disabled .name, .up:disabled .cost { opacity: .6; }
+  .up:not(:disabled) { border-color: var(--magma); }
+  .up:not(:disabled):hover { background: rgba(255,123,28,.22); }
+  .up .name { font-weight: 700; }
+  .up .desc { grid-column: 1 / -1; font-size: .85rem; color: var(--ash); }
+  .up .cost { font-family: var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ember); }
+
+  .erupt-box { display: grid; gap: 8px; padding: 14px; border: 2px solid var(--line); background: var(--panel); }
+  .meter { height: 10px; background: var(--obsidian); border: 2px solid var(--line); }
+  .meter > i { display: block; height: 100%; width: 0; background: var(--magma); }
+  .meter.log > i { background: var(--ember); }
+  .erupt {
+    border: 2px solid var(--magma); background: transparent; color: var(--magma); cursor: pointer;
+    font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; padding: 10px 12px;
+  }
+  .erupt:not(:disabled):hover { background: rgba(255,123,28,.15); }
+  .erupt.final:not(:disabled) { background: var(--magma); color: var(--obsidian); }
+  .erupt:disabled { opacity: .45; cursor: not-allowed; }
+  .hint { font-size: .82rem; color: var(--ash); margin: 0; }
+
+  footer { font-size: .8rem; color: var(--ash); display: grid; gap: 8px; }
+  footer p { margin: 0; max-width: 65ch; }
+  .linklike { background: none; border: 0; padding: 0; color: var(--ash); text-decoration: underline; cursor: pointer; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .btn { border: 2px solid var(--line); background: var(--panel); padding: 6px 10px; cursor: pointer; }
+  .btn.danger { border-color: var(--warn); color: var(--warn); }
+  .btn.on { border-color: var(--ember); color: var(--ember); }
+
+  .overlay { position: fixed; inset: 0; background: rgba(12, 8, 14, .78); display: grid; place-items: center; padding: 16px; z-index: 20; }
+  .modal { max-width: 440px; width: 100%; background: var(--panel); border: 2px solid var(--magma); padding: 22px; display: grid; gap: 12px; box-shadow: 0 8px 0 var(--obsidian); }
+  .modal h2 { font-family: var(--font-display); margin: 0; font-size: 1.5rem; line-height: 1.1; text-wrap: balance; }
+  .modal p { margin: 0; }
+  .modal .scoop { font-size: 1.1rem; padding: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene-wrap.shake { animation: none; }
+    .float { animation-duration: .01s; }
+  }
+</style>
+
+<div class="app">
+  <div class="col">
+    <header>
+      <h1>Vaciar el Vesubio<small>con una cuchara</small></h1>
+      <div class="legacy" id="legacy">Calderas: <b>0</b></div>
+    </header>
+
+    <div class="counter">
+      <span class="label">Cucharadas que faltan</span>
+      <span class="big" id="remaining">—</span>
+    </div>
+
+    <div class="scene-wrap" id="sceneWrap">
+      <canvas id="scene" width="320" height="200" aria-label="El Vesubio, tu agujero y tu montaña. Toca para sacar una cucharada."></canvas>
+    </div>
+    <div class="scene-caption">
+      <span id="lupaInfo">Lupa</span>
+      <span id="runTime">Vuelta: 0:00</span>
+    </div>
+
+    <div class="race">
+      <span>Sacas <b id="rateOut">0</b></span>
+      <span>Entra <b id="rateIn">0</b></span>
+      <span class="chip eq" id="raceChip">Equilibrio</span>
+    </div>
+
+    <button class="scoop" id="scoopBtn" type="button">Sacar una cucharada<span class="sub"><span id="scoopSub">+15 mL</span><span class="keyhint"> · o pulsa la barra espaciadora</span></span></button>
+  </div>
+
+  <div class="col">
+    <div class="stats">
+      <div class="stat"><span class="label">Vaciado</span><span class="v" id="emptied">0 %</span></div>
+      <div class="stat"><span class="label">Magma enfriado</span><span class="v hot" id="wallet">0</span></div>
+      <div class="stat"><span class="label">Tu cuchara ≈</span><span class="v" id="spoonNow">—</span></div>
+      <div class="stat"><span class="label">Tu montaña ≈</span><span class="v" id="mountain">nada</span></div>
+    </div>
+
+    <h2 class="section-title">Mejoras</h2>
+    <div class="upgrades">
+      <button class="up" id="up-spoon" type="button">
+        <span class="name">Cuchara más grande</span><span class="cost" id="cost-spoon">—</span>
+        <span class="desc" id="desc-spoon">Duplica el tamaño de la cuchara.</span>
+      </button>
+      <button class="up" id="up-helper" type="button">
+        <span class="name">Contratar ayudante</span><span class="cost" id="cost-helper">—</span>
+        <span class="desc" id="desc-helper">Saca media cucharada por segundo, también cuando no estás.</span>
+      </button>
+      <button class="up" id="up-speed" type="button">
+        <span class="name">Ayudantes más rápidos</span><span class="cost" id="cost-speed">—</span>
+        <span class="desc" id="desc-speed">Tus ayudantes trabajan el doble de rápido.</span>
+      </button>
+    </div>
+
+    <div class="erupt-box">
+      <div class="row" style="justify-content: space-between"><span class="label">Presión</span><span class="label" id="pressureTxt">0 %</span></div>
+      <div class="meter"><i id="pressureFill"></i></div>
+      <button class="erupt" id="eruptBtn" type="button" disabled>Provocar erupción</button>
+      <p class="hint" id="eruptHint">Multiplica el agujero ×10. Lo que sale vuela por los aires y no va a tu montaña.</p>
+    </div>
+
+    <div class="erupt-box">
+      <div class="row" style="justify-content: space-between"><span class="label">Camino a la caldera · escala logarítmica</span><span class="label" id="calderaPct">0 %</span></div>
+      <div class="meter log"><i id="calderaFill"></i></div>
+      <p class="hint" id="calderaHint">Cuando vacías el volcán entero, se hunde en una caldera y empiezas otro con un bonus permanente.</p>
+    </div>
+
+    <footer>
+      <p>Volumen del Vesubio: ≈ 66 km³ (cono simplificado de 14 km de base y 1.281 m de alto; no hay una cifra oficial del volumen). Las comparaciones son aproximadas.</p>
+      <p>Prototipo sin arte final. La partida se guarda en este navegador; tus ayudantes siguen trabajando aunque cierres la pestaña.</p>
+      <div class="row" id="resetRow"><button class="linklike" id="resetAsk" type="button">Borrar partida</button></div>
+      <div class="row" id="devRow" hidden>
+        <span>Modo prueba:</span>
+        <button class="btn" data-speed="1" type="button">Tiempo ×1</button>
+        <button class="btn" data-speed="10" type="button">×10</button>
+        <button class="btn" data-speed="100" type="button">×100</button>
+        <button class="btn" id="dev8h" type="button">Simular 8 h fuera</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<div class="overlay" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody" style="display:grid; gap:8px"></div>
+    <button class="scoop" id="modalBtn" type="button">Seguir</button>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script>
+(() => {
+  'use strict';
+  const V = window.Volcan;
+  const VT = V.VOLCANO.volume, R = V.VOLCANO.radius, HV = V.VOLCANO.height;
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Formato ----------
+  const NF0 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
+  const NF3 = new Intl.NumberFormat('es-ES', { maximumSignificantDigits: 3 });
+  const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+  const sup = (n) => String(n).split('').map((c) => SUP[c]).join('');
+  function sci(x) { const e = Math.floor(Math.log10(x)); return NF3.format(x / Math.pow(10, e)) + ' × 10' + sup(e); }
+  function num(x) { if (!isFinite(x)) return '∞'; if (Math.abs(x) >= 1e15) return sci(x); return Math.abs(x) >= 1000 ? NF0.format(x) : NF3.format(x); }
+  function vol(m3) {
+    if (!(m3 > 0)) return '0 mL';
+    if (m3 < 1e-3) return NF3.format(m3 * 1e6) + ' mL';
+    if (m3 < 1) return NF3.format(m3 * 1e3) + ' L';
+    if (m3 < 1e9) return num(m3) + ' m³';
+    return num(m3 / 1e9) + ' km³';
+  }
+  function len(m) {
+    if (m < 0.01) return NF3.format(m * 1000) + ' mm';
+    if (m < 1) return NF3.format(m * 100) + ' cm';
+    if (m < 1000) return NF3.format(m) + ' m';
+    return NF3.format(m / 1000) + ' km';
+  }
+  function pct(p) {
+    if (p >= 99.995) return '100 %';
+    if (p <= 0) return '0 %';
+    if (p >= 0.01) return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(p) + ' %';
+    const d = Math.min(20, Math.ceil(-Math.log10(p)) + 1);
+    return new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d }).format(p) + ' %';
+  }
+  function dur(s) {
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    if (h) return h + ' h ' + m + ' min';
+    return m + ':' + String(ss).padStart(2, '0');
+  }
+
+  // ---------- Estado y guardado ----------
+  let st = null;
+  let speed = 1;
+  let paused = false;
+  let collapse = 0;          // 0..1 animación de caldera
+  let dip = 0;               // animación de la cuchara
+  const clickTimes = [];
+  const particles = [];
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(V.C.SAVE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (s && s.v === 1) return Object.assign(V.newState(Date.now()), s);
+    } catch (e) { /* sin almacenamiento: partida nueva */ }
+    return null;
+  }
+  function save() {
+    if (!st) return;
+    if (document.visibilityState !== 'hidden') st.lastSeen = Date.now();
+    try { localStorage.setItem(V.C.SAVE_KEY, JSON.stringify(st)); } catch (e) { /* sin almacenamiento */ }
+  }
+
+  // ---------- Modal ----------
+  let onModalClose = null;
+  function showModal(title, html, btn, cb) {
+    $('modalTitle').textContent = title;
+    $('modalBody').innerHTML = html;
+    $('modalBtn').textContent = btn;
+    onModalClose = cb || null;
+    $('modal').hidden = false;
+    $('modalBtn').focus();
+  }
+  const modalOpen = () => !$('modal').hidden;
+  $('modalBtn').addEventListener('click', () => {
+    $('modal').hidden = true;
+    const cb = onModalClose; onModalClose = null;
+    if (cb) cb();
+    $('scoopBtn').focus();
+  });
+
+  function applyAway(seconds) {
+    if (!(seconds > 30)) return;
+    const r = V.offline(st, seconds);
+    const body = st.helpers > 0
+      ? `<p>Tus ${st.helpers} ayudantes sacaron <b>${vol(r.gained)}</b>, que es ≈ ${V.fermi(r.gained)}.</p><p>El agujero no se ha rellenado mientras no estabas.</p>`
+      : '<p>No tenías ayudantes, así que nadie sacó magma. Contrata uno para que el trabajo siga sin ti.</p>';
+    showModal('Has estado fuera ' + dur(seconds), body, 'Seguir');
+  }
+
+  // ---------- Acciones ----------
+  function floatText(txt) {
+    if (reduceMotion) return;
+    const el = document.createElement('span');
+    el.className = 'float'; el.textContent = txt;
+    el.style.left = (35 + Math.random() * 30) + '%';
+    $('scoopBtn').appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  }
+  function doScoop() {
+    if (paused || modalOpen()) return;
+    const v = V.scoop(st);
+    clickTimes.push(performance.now());
+    dip = 1;
+    floatText('+' + vol(v));
+    for (let i = 0; i < 5; i++) particles.push({ lupa: true, x: 0, y: 0, vx: (Math.random() - .5) * 60, vy: -40 - Math.random() * 50, life: .6, c: Math.random() < .5 ? '#ffc15c' : '#ff7b1c' });
+  }
+  function doErupt() {
+    if (paused || !V.canErupt(st)) return;
+    V.erupt(st);
+    if (!reduceMotion) {
+      const w = $('sceneWrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake');
+      for (let i = 0; i < 70; i++) particles.push({ lupa: false, x: 0, y: 0, vx: (Math.random() - .5) * 90, vy: -60 - Math.random() * 110, life: 1.2 + Math.random() * .8, c: ['#ffc15c', '#ff7b1c', '#ff4d2e', '#b8aab0'][i % 4] });
+    }
+  }
+  function startCollapse() {
+    paused = true; collapse = 0.0001;
+    if (!reduceMotion) { const w = $('sceneWrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+  }
+  function finishCollapse() {
+    const bonus = V.calderaBonus(st);
+    const body = `<p>Has vaciado el volcán y se ha desplomado sobre sí mismo, como Santorini o el Crater Lake.</p>
+      <p>En ${dur(st.runSeconds)} sacaste <b>${vol(st.runTotal)}</b>, ≈ ${V.fermi(st.runTotal)}.</p>
+      <p>Bonus permanente: <b>×${NF3.format(bonus)}</b> a todo lo que saques a partir de ahora.</p>`;
+    showModal('¡El Vesubio se ha hundido!', body, 'Empezar con un Vesubio nuevo', () => {
+      V.caldera(st, Date.now());
+      collapse = 0; paused = false; particles.length = 0;
+      save(); updateUI();
+    });
+  }
+
+  // ---------- Dibujo ----------
+  const cv = $('scene');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const VE = 3; // exageración vertical del dibujo (el Vesubio real es muy plano)
+
+  // Recorta un polígono (coordenadas del mundo) contra un rectángulo (Sutherland–Hodgman).
+  function clip(pts, b) {
+    const edges = [
+      [(p) => p[0] >= b.x0, (p, q) => [b.x0, p[1] + (b.x0 - p[0]) / (q[0] - p[0]) * (q[1] - p[1])]],
+      [(p) => p[0] <= b.x1, (p, q) => [b.x1, p[1] + (b.x1 - p[0]) / (q[0] - p[0]) * (q[1] - p[1])]],
+      [(p) => p[1] >= b.y0, (p, q) => [p[0] + (b.y0 - p[1]) / (q[1] - p[1]) * (q[0] - p[0]), b.y0]],
+      [(p) => p[1] <= b.y1, (p, q) => [p[0] + (b.y1 - p[1]) / (q[1] - p[1]) * (q[0] - p[0]), b.y1]],
+    ];
+    let out = pts;
+    for (const [inside, cut] of edges) {
+      const inp = out; out = [];
+      for (let i = 0; i < inp.length; i++) {
+        const cur = inp[i], prev = inp[(i + inp.length - 1) % inp.length];
+        const ci = inside(cur), pi = inside(prev);
+        if (ci) { if (!pi) out.push(cut(prev, cur)); out.push(cur); } else if (pi) out.push(cut(prev, cur));
+      }
+      if (!out.length) break;
+    }
+    return out;
+  }
+  // Vista: el punto del mundo (cx, cy) se dibuja en (ox, oy); scale = metros por píxel; rect = zona de pantalla.
+  function view(cx, cy, scale, ox, oy, rect) {
+    const pad = 24;
+    return {
+      cx, cy, scale, ox, oy, ve: VE,
+      b: {
+        x0: cx + (rect[0] - ox - pad) * scale, x1: cx + (rect[2] - ox + pad) * scale,
+        y0: cy - (rect[3] - oy + pad) * scale / VE, y1: cy + (oy - rect[1] + pad) * scale / VE,
+      },
+    };
+  }
+  const sx = (v, x) => v.ox + (x - v.cx) / v.scale;
+  const sy = (v, y) => v.oy - (y - v.cy) * v.ve / v.scale;
+  function path(v, pts) {
+    const p = clip(pts, v.b);
+    if (p.length < 3) return false;
+    ctx.beginPath();
+    p.forEach(([x, y], i) => (i ? ctx.lineTo(sx(v, x), sy(v, y)) : ctx.moveTo(sx(v, x), sy(v, y))));
+    ctx.closePath();
+    return true;
+  }
+  function fillPoly(v, pts, color) { if (path(v, pts)) { ctx.fillStyle = color; ctx.fill(); } }
+  function rockPoly(v, pts) {
+    if (!path(v, pts)) return;
+    ctx.fillStyle = '#5a4a52'; ctx.fill();
+    ctx.strokeStyle = '#8a747f'; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.stroke();
+  }
+
+  const holeDepth = (h) => Math.cbrt(3 * h * HV * HV / (Math.PI * R * R));
+  function pileSize(m) {
+    const tan = Math.tan(33 * Math.PI / 180); // ángulo de reposo
+    const r = Math.cbrt(3 * m / (Math.PI * tan));
+    return { r, h: r * tan };
+  }
+
+  function drawWorld(v) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#2b1d36'); g.addColorStop(1, '#4e2c3c');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    const d = Math.min(HV, holeDepth(st.hole));
+    const r = R * d / HV, ys = HV - d;
+    const e = collapse > 0 ? 1 - Math.pow(1 - collapse, 3) : 0;
+    if (e > 0) {
+      // Caldera: la cima se hunde y queda un lago.
+      const top = HV * (1 - 0.4 * e), rc = R * 0.3 * e, dep = HV * 0.22 * e;
+      rockPoly(v, [[-R, 0], [-rc, top], [-rc * 0.55, top - dep], [rc * 0.55, top - dep], [rc, top], [R, 0]]);
+      fillPoly(v, [[-rc * 0.55, top - dep], [rc * 0.55, top - dep], [rc * 0.78, top - dep * 0.4], [-rc * 0.78, top - dep * 0.4]], '#3d6b8a');
+    } else {
+      rockPoly(v, [[-R, 0], [0, HV], [R, 0]]);
+      if (d > 0) fillPoly(v, [[-r, ys], [0, HV], [r, ys]], '#120d16');
+      fillPoly(v, [[-R, 0], [-r, ys], [r, ys], [R, 0]], '#e2560f');
+      const s2 = 2 * v.scale / v.ve, r2 = R * Math.min(HV, d + s2) / HV;
+      fillPoly(v, [[-r2, ys - s2], [-r, ys], [r, ys], [r2, ys - s2]], '#ffb347');
+    }
+    // Montaña de magma enfriado
+    if (st.runTotal > 0) {
+      const p = pileSize(st.runTotal), px = R * 0.85 + p.r;
+      fillPoly(v, [[px - p.r, 0], [px, p.h], [px + p.r, 0]], '#0b080e');
+      fillPoly(v, [[px - p.r, 0], [px, p.h], [px - p.r * 0.2, 0]], '#2a2030');
+    }
+    // Suelo
+    const bottom = Math.min(v.b.y0, 0) - 1;
+    fillPoly(v, [[v.b.x0, 0], [v.b.x1, 0], [v.b.x1, bottom], [v.b.x0, bottom]], '#2a1d24');
+    return { ys, r, d };
+  }
+
+  // Cuchara: (x, ys) en el mundo; se eleva "lift" píxeles sobre la superficie.
+  function drawSpoon(v, x, ys, l, lift) {
+    const bx = sx(v, x), by = sy(v, ys) - lift;
+    const rx = Math.max(1.5, l * 0.55 / v.scale), ry = Math.max(1, l * 0.32 / v.scale);
+    ctx.strokeStyle = '#d6d0d4'; ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1, l * 0.18 / v.scale);
+    ctx.beginPath(); ctx.moveTo(bx + rx * 0.8, by - ry * 0.4); ctx.lineTo(bx + rx * 2.6, by - ry * 3.2); ctx.stroke();
+    ctx.fillStyle = '#d6d0d4';
+    ctx.beginPath(); ctx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = dip > 0.25 ? '#ff7b1c' : '#8d868c';
+    ctx.beginPath(); ctx.ellipse(bx, by - ry * 0.15, rx * 0.7, ry * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    return [bx, by];
+  }
+
+  function niceLen(target) {
+    const p = Math.pow(10, Math.floor(Math.log10(target)));
+    for (const m of [5, 2, 1]) if (m * p <= target) return m * p;
+    return p;
+  }
+
+  let lastLupa = { zoom: 0, bar: 0 };
+  function draw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    // Vista principal: el Vesubio entero y tu montaña.
+    const pile = st.runTotal > 0 ? pileSize(st.runTotal) : { r: 0, h: 0 };
+    const x1 = Math.max(R, R * 0.85 + 2 * pile.r);
+    const groundY = H * 0.86;
+    const scaleMain = Math.max((x1 + R) * 1.06 / W, Math.max(HV, pile.h) * VE * 1.2 / (groundY - 6));
+    const vm = view((x1 - R) / 2, 0, scaleMain, W / 2, groundY, [0, 0, W, H]);
+    const geo = drawWorld(vm);
+    const topX = sx(vm, 0), topY = sy(vm, geo.ys);
+
+    const l = Math.cbrt(V.spoon(st));   // tamaño lineal de la cuchara
+    const scaleL = l / 9;               // en la lupa la cuchara mide ~9 px
+    const zoom = scaleMain / scaleL;
+    const showLupa = zoom > 2 && collapse === 0;
+
+    for (const p of particles) if (!p.lupa) { ctx.fillStyle = p.c; ctx.fillRect(Math.round(topX + p.x), Math.round(topY + p.y), 2, 2); }
+
+    if (!showLupa && collapse === 0) {
+      const [bx, by] = drawSpoon(vm, 0, geo.ys, l, (l / scaleMain) * (1.2 - dip * 1.1));
+      for (const p of particles) if (p.lupa) { ctx.fillStyle = p.c; ctx.fillRect(Math.round(bx + p.x), Math.round(by + p.y), 2, 2); }
+      lastLupa = { zoom: 0, bar: 0 };
+      return;
+    }
+    if (!showLupa) { lastLupa = { zoom: 0, bar: 0 }; return; }
+
+    // Lupa: la cuchara a su escala real.
+    const lr = 54, lx = lr + 8, ly = lr + 8;
+    ctx.strokeStyle = 'rgba(244,233,221,.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(topX, topY); ctx.lineTo(lx + lr * 0.71, ly + lr * 0.71); ctx.stroke();
+    ctx.fillStyle = '#f4e9dd'; ctx.fillRect(Math.round(topX) - 1, Math.round(topY) - 1, 3, 3);
+    ctx.font = '8px "Pixelify Sans", monospace'; ctx.textBaseline = 'bottom';
+    ctx.fillText('tú', Math.round(topX) + 4, Math.round(topY) - 2);
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.clip();
+    const vl = view(0, geo.ys, scaleL, lx, ly + 14, [lx - lr, ly - lr, lx + lr, ly + lr]);
+    drawWorld(vl);
+    const [bx, by] = drawSpoon(vl, 0, geo.ys, l, 8 - dip * 9);
+    for (const p of particles) if (p.lupa) { ctx.fillStyle = p.c; ctx.fillRect(Math.round(bx + p.x), Math.round(by + p.y), 2, 2); }
+    const bar = niceLen(30 * scaleL), bpx = bar / scaleL;
+    ctx.fillStyle = '#f4e9dd';
+    ctx.fillRect(Math.round(lx - bpx / 2), Math.round(ly + lr - 12), Math.round(bpx), 2);
+    ctx.restore();
+    ctx.strokeStyle = '#f4e9dd'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.stroke();
+    lastLupa = { zoom, bar };
+  }
+
+  // ---------- Interfaz ----------
+  const KINDS = ['spoon', 'helper', 'speed'];
+  function updateUI() {
+    const now = performance.now();
+    while (clickTimes.length && now - clickTimes[0] > 2000) clickTimes.shift();
+    const cps = clickTimes.length / 2;
+    const auto = V.autoRate(st);
+    const out = auto + cps * V.clickVolume(st);
+    const inn = V.inflow(st);
+
+    const left = Math.max(0, (VT - st.hole) / V.spoon(st));
+    $('remaining').textContent = left < 1e21 ? NF0.format(Math.ceil(left)) : sci(left);
+    $('rateOut').textContent = vol(out) + '/s';
+    $('rateIn').textContent = vol(inn) + '/s';
+    const chip = $('raceChip');
+    if (out > inn * 1.05) { chip.textContent = 'El nivel baja'; chip.className = 'chip down'; }
+    else if (out < inn * 0.95) { chip.textContent = 'Se rellena'; chip.className = 'chip up'; }
+    else { chip.textContent = 'Equilibrio'; chip.className = 'chip eq'; }
+
+    $('emptied').textContent = pct(st.hole / VT * 100);
+    $('wallet').textContent = vol(st.magma);
+    $('spoonNow').textContent = V.fermi(V.spoon(st));
+    $('mountain').textContent = V.fermi(st.runTotal);
+    $('scoopSub').textContent = '+' + vol(V.clickVolume(st));
+
+    for (const k of KINDS) {
+      const c = V.cost(st, k);
+      const b = $('up-' + k);
+      b.disabled = st.magma < c || paused;
+      b.style.setProperty('--p', Math.min(1, st.magma / c).toFixed(3));
+      $('cost-' + k).textContent = vol(c);
+    }
+    $('desc-spoon').textContent = 'Duplica el tamaño de la cuchara. Ahora ≈ ' + V.fermi(V.spoon(st)) + '.';
+    $('desc-helper').textContent = 'Saca media cucharada por segundo, también cuando no estás. Tienes ' + st.helpers + '.';
+    $('desc-speed').textContent = 'Tus ayudantes trabajan el doble de rápido. Ritmo ×' + NF0.format(Math.pow(2, st.speedLvl)) + '.';
+
+    $('pressureFill').style.width = (st.pressure * 100).toFixed(1) + '%';
+    $('pressureTxt').textContent = Math.floor(st.pressure * 100) + ' %';
+    const final = st.hole * V.C.ERUPT_MULT >= VT * 0.999999;
+    const eb = $('eruptBtn');
+    eb.disabled = !V.canErupt(st) || paused;
+    eb.classList.toggle('final', final);
+    eb.textContent = final ? 'Erupción final: hundir el volcán' : 'Provocar erupción';
+    $('eruptHint').textContent = final
+      ? 'Esta erupción vacía lo que queda y el volcán se hundirá. Si esperas, tu montaña crece y el bonus será mayor.'
+      : 'Multiplica el agujero ×10. Lo que sale vuela por los aires y no va a tu montaña.';
+
+    const potential = Math.max(st.hole, auto * V.C.TAU);
+    const prog = Math.max(0, Math.min(1, Math.log10(Math.max(potential, V.C.S0) / V.C.S0) / Math.log10(VT / V.C.S0)));
+    $('calderaFill').style.width = (prog * 100).toFixed(1) + '%';
+    $('calderaPct').textContent = Math.floor(prog * 100) + ' %';
+    $('calderaHint').textContent = 'Cuando vacías el volcán entero, se hunde en una caldera y empiezas otro. Si se hundiera ahora, el bonus sería ×' + NF3.format(V.calderaBonus(st)) + '.';
+
+    $('legacy').innerHTML = st.calderas
+      ? 'Calderas: <b>' + st.calderas + '</b> · bonus <b>×' + NF3.format(st.legacy) + '</b>'
+      : 'Calderas: <b>0</b>';
+    $('runTime').textContent = 'Vuelta: ' + dur(st.runSeconds) + (st.bestRunSeconds ? ' · récord ' + dur(st.bestRunSeconds) : '');
+    $('lupaInfo').textContent = collapse > 0 ? 'El volcán se está hundiendo' : lastLupa.zoom
+      ? 'Lupa ×' + num(Math.round(lastLupa.zoom)) + ' · la barra blanca mide ' + len(lastLupa.bar)
+      : 'Tu cuchara ya se ve sin lupa';
+    $('lupaInfo').textContent += ' · altura del dibujo ×3';
+  }
+
+  // ---------- Bucle ----------
+  let last = performance.now();
+  let uiAcc = 0;
+  function frame(now) {
+    const dt = Math.min(0.25, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (!paused && !modalOpen()) {
+      V.tick(st, dt * speed);
+      if (V.calderaReady(st)) startCollapse();
+    }
+    if (collapse > 0 && collapse < 1) {
+      collapse = Math.min(1, collapse + dt / 2.2);
+      if (collapse >= 1) finishCollapse();
+    }
+    dip = Math.max(0, dip - dt * 5);
+    for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; p.life -= dt; }
+    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+    draw();
+    uiAcc += dt;
+    if (uiAcc >= 0.1) { uiAcc = 0; updateUI(); }
+    requestAnimationFrame(frame);
+  }
+
+  function bind() {
+    $('scoopBtn').addEventListener('click', doScoop);
+    cv.addEventListener('click', doScoop);
+    document.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space' || e.repeat) return;
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault(); doScoop();
+    });
+    for (const k of KINDS) $('up-' + k).addEventListener('click', () => { if (!paused && V.buy(st, k)) updateUI(); });
+    $('eruptBtn').addEventListener('click', doErupt);
+
+    $('resetAsk').addEventListener('click', () => {
+      const row = $('resetRow');
+      row.innerHTML = '<span>¿Borrar la partida? Se pierde todo, también las calderas.</span>' +
+        '<button class="btn danger" id="resetYes" type="button">Sí, borrar</button>' +
+        '<button class="btn" id="resetNo" type="button">Cancelar</button>';
+      $('resetYes').addEventListener('click', () => {
+        st = V.newState(Date.now()); paused = false; collapse = 0; particles.length = 0;
+        save(); location.reload();
+      });
+      $('resetNo').addEventListener('click', () => location.reload());
+    });
+
+    // Modo prueba: añade #prueba a la URL
+    if (/^#(prueba|dev)$/.test(location.hash)) {
+      $('devRow').hidden = false;
+      const btns = Array.from(document.querySelectorAll('[data-speed]'));
+      const mark = () => btns.forEach((b) => b.classList.toggle('on', Number(b.dataset.speed) === speed));
+      btns.forEach((b) => b.addEventListener('click', () => { speed = Number(b.dataset.speed); mark(); }));
+      mark();
+      $('dev8h').addEventListener('click', () => applyAway(8 * 3600));
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') { st.lastSeen = Date.now(); save(); }
+      else {
+        const away = (Date.now() - st.lastSeen) / 1000;
+        last = performance.now();
+        if (away > 30 && !paused) applyAway(away);
+        st.lastSeen = Date.now();
+      }
+    });
+    window.addEventListener('pagehide', save);
+    setInterval(save, 5000);
+  }
+
+  function boot(data) {
+    const hotSt = data && data.st;
+    st = hotSt ? Object.assign(V.newState(Date.now()), hotSt) : (load() || V.newState(Date.now()));
+    bind();
+    if (!hotSt) applyAway((Date.now() - st.lastSeen) / 1000);
+    st.lastSeen = Date.now();
+    updateUI();
+    requestAnimationFrame((t) => { last = t; frame(t); });
+  }
+
+  const hot = window.claude && window.claude.hot;
+  if (hot && typeof hot.snapshot === 'function') hot.snapshot(() => ({ st }));
+  if (hot && typeof hot.ready === 'function') hot.ready(boot);
+  else boot((hot && hot.data) || {});
+})();
+</script>
