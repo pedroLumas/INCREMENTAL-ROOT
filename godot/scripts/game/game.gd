@@ -310,6 +310,7 @@ func to_dict() -> Dictionary:
 	return {
 		"v": SAVE_VERSION,
 		"grid": Marshalls.raw_to_base64(world.mat),
+		"interior": Marshalls.raw_to_base64(world.interior),
 		"machines": ms,
 		"res": res,
 		"levels": levels,
@@ -332,6 +333,9 @@ static func from_dict(d: Dictionary) -> Game:
 	if grid.size() == g.world.mat.size():
 		g.world.mat = grid
 		g.world.recount()
+	var inter := Marshalls.base64_to_raw(String(d.get("interior", "")))
+	if inter.size() == g.world.interior.size():
+		g.world.interior = inter
 	g.knowledge = float(d.get("knowledge", 1.0))
 	g.total_m3 = float(d.get("total_m3", 0.0))
 	g.magma_start = int(d.get("magma_start", g.magma_start))

@@ -1,0 +1,538 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vaciar el Vesubio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Rubik:wght@400;500;700&display=swap">
+<style>
+  /* Layout: escena + barra de máquinas a la izquierda, panel del volcán a la derecha; en móvil, una columna. */
+  :root {
+    color-scheme: dark;
+    --night: #1c1521;       /* fondo: noche volcánica */
+    --panel: #271e2c;
+    --line: #3d3142;
+    --ash: #b8aab0;
+    --bone: #f4e9dd;
+    --magma: #ff7b1c;
+    --magma-deep: #b8420c;
+    --ember: #ffc15c;
+    --obsidian: #120d16;
+    --energy: #7fc8ff;
+    --good: #8fd694;
+    --warn: #ff9f6b;
+    --bad: #ff6b5b;
+    --font-display: "Pixelify Sans", "Courier New", monospace;
+    --font-body: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  /* Sin ligaduras: en Pixelify Sans la ligadura "fi" parece una "Á". */
+  body { margin: 0; background: var(--night); color: var(--bone); font-family: var(--font-body); font-size: 14px; line-height: 1.45; font-variant-ligatures: none; font-feature-settings: "liga" 0; }
+  .app {
+    max-width: 1240px; margin: 0 auto; display: grid; gap: 12px;
+    padding-block: 14px 32px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.4rem, 4vw, 1.9rem); line-height: 1; margin: 0; text-wrap: balance; }
+  .scale { font-family: var(--font-display); color: var(--magma); font-size: 1rem; margin-top: 4px; }
+  .res { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; font-variant-numeric: tabular-nums; }
+  .res .k { color: var(--ash); font-size: .8rem; margin-right: 6px; }
+  .res .v { font-family: var(--font-display); font-size: 1.15rem; }
+  .res .obs { color: var(--ember); } .res .ene { color: var(--energy); }
+  .ebar { display: inline-block; width: 70px; height: 8px; background: var(--obsidian); border: 1px solid var(--line); vertical-align: middle; margin-left: 6px; }
+  .ebar > i { display: block; height: 100%; width: 0; background: var(--energy); }
+
+  .layout { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; } }
+  .stage { display: grid; gap: 8px; min-width: 0; }
+  .scene-wrap { position: relative; border: 2px solid var(--line); background: var(--obsidian); }
+  canvas#scene { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: manipulation; cursor: crosshair; }
+  .toast {
+    position: absolute; left: 10px; top: 10px; max-width: calc(100% - 20px);
+    background: rgba(18, 13, 22, .9); border: 2px solid var(--warn); padding: 6px 10px; font-weight: 700; pointer-events: none;
+  }
+  .taphint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); background: rgba(18, 13, 22, .9); border: 2px solid var(--good); color: var(--good); padding: 4px 10px; font-family: var(--font-display); pointer-events: none; white-space: nowrap; }
+  .hoverline { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: .8rem; color: var(--ash); min-height: 1.2em; }
+
+  .toolbar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .tool {
+    flex: 0 0 auto; width: 136px; text-align: left; display: grid; gap: 2px; padding: 9px 10px; cursor: pointer;
+    background: var(--panel); border: 2px solid var(--line); color: var(--bone); font: inherit;
+  }
+  .tool:hover { border-color: var(--ember); }
+  .tool[aria-pressed="true"] { border-color: var(--ember); background: #352a3b; box-shadow: inset 0 -3px 0 var(--ember); }
+  .tool .n { font-family: var(--font-display); font-size: 1.02rem; }
+  .tool .c { font-size: .78rem; color: var(--ember); font-variant-numeric: tabular-nums; }
+  .tool .c.no { color: var(--bad); }
+  .tool .o { font-size: .72rem; color: var(--ash); }
+  .tool.cancel { width: auto; align-content: center; color: var(--warn); border-color: var(--warn); font-family: var(--font-display); }
+
+  .side { display: grid; gap: 10px; min-width: 0; }
+  .panel { background: var(--panel); border: 2px solid var(--line); padding: 12px; display: grid; gap: 6px; }
+  .label { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ash); }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .meter { height: 10px; background: var(--obsidian); border: 2px solid var(--line); }
+  .meter > i { display: block; height: 100%; width: 0; background: var(--magma); }
+  .meter.p > i { background: var(--bad); }
+  .small { font-size: .8rem; color: var(--ash); }
+  .race { display: flex; gap: 12px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+  .chip { font-family: var(--font-display); font-size: .9rem; }
+  .chip.down { color: var(--good); } .chip.up { color: var(--warn); } .chip.eq { color: var(--ash); }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; margin: 0; text-wrap: balance; }
+  #infoBody p { margin: 0 0 8px; } #infoBody p:last-child { margin: 0; }
+  .st-ok { color: var(--good); } .st-bad { color: var(--warn); }
+  .btn { font: inherit; color: var(--bone); background: var(--obsidian); border: 2px solid var(--line); padding: 8px 10px; cursor: pointer; text-align: center; }
+  .btn:hover:not(:disabled) { border-color: var(--ember); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.danger { border-color: var(--warn); color: var(--warn); }
+  .big {
+    font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--obsidian); background: var(--magma);
+    border: 0; padding: 12px; cursor: pointer; box-shadow: 0 5px 0 var(--magma-deep);
+  }
+  .big:active { transform: translateY(5px); box-shadow: none; }
+  .keys { font-size: .75rem; color: var(--ash); margin: 0; }
+  .linklike { background: none; border: 0; padding: 0; color: var(--ash); text-decoration: underline; cursor: pointer; font: inherit; font-size: .78rem; }
+  .devrow { display: flex; flex-wrap: wrap; gap: 6px; }
+  .devrow .btn { padding: 4px 8px; font-size: .78rem; }
+  .devrow .btn.on { border-color: var(--ember); color: var(--ember); }
+  footer { font-size: .75rem; color: var(--ash); display: grid; gap: 6px; }
+  footer p { margin: 0; }
+  :focus-visible { outline: 3px solid var(--ember); outline-offset: 2px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(12, 8, 14, .8); display: grid; place-items: center; padding: 16px; z-index: 20; }
+  .modal { max-width: 460px; width: 100%; background: var(--panel); border: 2px solid var(--magma); padding: 20px; display: grid; gap: 12px; box-shadow: 0 8px 0 var(--obsidian); }
+  .modal h2 { font-size: 1.5rem; }
+  .modal p { margin: 0; }
+  .modal .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .modal .actions .big { flex: 1 1 auto; }
+  @media (prefers-reduced-motion: reduce) { .big:active { transform: none; } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Vaciar el Vesubio</h1>
+      <div class="scale" id="scale">Escala 1 · Una grieta</div>
+    </div>
+    <div class="res" aria-live="off">
+      <span><span class="k">Obsidiana</span><span class="v obs" id="rObs">0</span></span>
+      <span><span class="k">Basalto</span><span class="v" id="rBas">0</span></span>
+      <span><span class="k">Energía</span><span class="v ene" id="rEne">0</span><span class="ebar"><i id="eBar"></i></span></span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="stage">
+      <div class="scene-wrap">
+        <canvas id="scene" width="320" height="180" aria-label="Corte del Vesubio. Elige una máquina y toca la escena para construirla."></canvas>
+        <div class="toast" id="toast" hidden></div>
+        <div class="taphint" id="tapHint" hidden>Toca otra vez para construir</div>
+      </div>
+      <div class="hoverline"><span id="hoverInfo"></span><span id="cellInfo"></span></div>
+      <div class="toolbar" id="toolbar" role="toolbar" aria-label="Máquinas"></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="row"><span class="label">Vaciado</span><span class="label" id="drainTxt">0 % · meta 90 %</span></div>
+        <div class="meter"><i id="drainBar"></i></div>
+        <div class="small" id="magmaTxt"></div>
+        <div class="race"><span>Entra <b id="rateIn">0</b></span><span>Sale <b id="rateOut">0</b></span></div>
+        <div class="chip eq" id="chip">Equilibrio</div>
+        <div class="row"><span class="label">Presión</span><span class="label" id="pressTxt">0 %</span></div>
+        <div class="meter p"><i id="pressBar"></i></div>
+      </section>
+      <button class="big" id="zoomBtn" type="button" hidden>Alejar la cámara</button>
+      <section class="panel" id="info">
+        <h2 id="infoTitle">Cómo empezar</h2>
+        <div id="infoBody"></div>
+        <button class="btn" id="infoBtn1" type="button" hidden></button>
+        <button class="btn" id="infoBtn2" type="button" hidden></button>
+      </section>
+      <p class="keys">Teclado: 1–6 elegir máquina · Esc o clic derecho: soltar · Supr: quitar la seleccionada. En el móvil: toca para ver dónde va y toca otra vez para construir.</p>
+      <section class="panel" id="dev" hidden>
+        <span class="label">Modo prueba</span>
+        <div class="devrow" id="speedRow"></div>
+        <div class="devrow">
+          <button class="btn" id="devRes" type="button">+500 recursos</button>
+          <button class="btn" id="dev8h" type="button">8 h fuera</button>
+          <button class="btn" id="devDrain" type="button">Vaciar 90 %</button>
+        </div>
+      </section>
+      <footer>
+        <p>Cada celda es un trozo de magma real: 1 L en la primera escala. Volumen del Vesubio: ≈ 66 km³ (cono simplificado; no hay cifra oficial). Las comparaciones son aproximadas.</p>
+        <p>Prototipo con arte provisional. La partida se guarda en este navegador. Añade <b>#prueba</b> a la dirección para el modo prueba.</p>
+        <div id="resetRow"><button class="linklike" id="resetAsk" type="button">Borrar partida</button></div>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<div class="overlay" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody" style="display:grid; gap:8px"></div>
+    <div class="actions">
+      <button class="big" id="modalOk" type="button">Seguir</button>
+      <button class="btn" id="modalCancel" type="button" hidden>Todavía no</button>
+    </div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  'use strict';
+  const V = window.Vesubio;
+  const { W, H, PX, CATALOG, ORDER, Fmt, RULES, SCALES } = V;
+  const { AIR, MACHINE, MAGMA } = V.MAT;
+  const $ = (id) => document.getElementById(id);
+  const KEY = 'vesubio-sim-v2';
+
+  let game = null;
+  let tool = '';            // máquina que se está construyendo
+  let hover = null;         // celda {x, y} bajo el ratón o el último toque
+  let tapPending = false;   // móvil: primer toque ya puso la vista previa
+  let selected = null;      // máquina seleccionada
+  let speed = 1;
+  let toastT = 0;
+  let hiddenAt = 0;
+
+  // ---------- Guardado ----------
+  function save() {
+    if (!game) return;
+    try { localStorage.setItem(KEY, JSON.stringify(game.toDict())); } catch (e) { /* sin almacenamiento */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (d && d.v === V.SAVE_VERSION) return d;
+    } catch (e) { /* partida nueva */ }
+    return null;
+  }
+
+  // ---------- Modal ----------
+  let modalCb = null;
+  function showModal(title, html, ok, cancel, cb) {
+    $('modalTitle').textContent = title;
+    $('modalBody').innerHTML = html;
+    $('modalOk').textContent = ok;
+    $('modalCancel').textContent = cancel || '';
+    $('modalCancel').hidden = !cancel;
+    modalCb = cb || null;
+    $('modal').hidden = false;
+    $('modalOk').focus();
+  }
+  function closeModal(accepted) {
+    $('modal').hidden = true;
+    const cb = modalCb; modalCb = null;
+    if (accepted && cb) cb();
+  }
+  $('modalOk').addEventListener('click', () => closeModal(true));
+  $('modalCancel').addEventListener('click', () => closeModal(false));
+
+  function showOffline(seconds) {
+    const got = game.applyOffline(seconds);
+    const body = got.obsidiana + got.basalto < 1
+      ? '<p>No tenías nada produciendo, así que no ha cambiado nada. El magma te espera donde lo dejaste.</p>'
+      : `<p>Tus máquinas siguieron trabajando a medio ritmo:</p><p><b>+${Fmt.num(got.obsidiana)} obsidiana</b> · <b>+${Fmt.num(got.basalto)} basalto</b> · +${Fmt.num(got.energia)} energía</p><p>El magma te espera donde lo dejaste.</p>`;
+    showModal('Has estado fuera ' + Fmt.dur(got.seconds), body, 'Seguir');
+  }
+  function askZoom() {
+    const next = SCALES[Math.min(game.scaleIdx + 1, SCALES.length - 1)];
+    showModal('Alejar la cámara',
+      `<p>Has vaciado <b>${game.scaleName().toLowerCase()}</b>. Al alejar la cámara empiezas de nuevo, pero ahora cada celda es <b>${Fmt.vol(next.cell)}</b> de magma.</p><p>Tus máquinas se quedan atrás. Te llevas lo aprendido: <b>todo rinde ×${Fmt.sig(game.knowledge * RULES.KNOWLEDGE_PER_SCALE)}</b> para siempre.</p>`,
+      'Alejar', 'Todavía no', () => { game.zoomOut(); tool = ''; selected = null; save(); updateUI(); });
+  }
+
+  // ---------- Avisos ----------
+  function toast(text) { $('toast').textContent = text; $('toast').hidden = false; toastT = 4; }
+
+  // ---------- Barra de máquinas ----------
+  const toolEls = {};
+  function buildToolbar() {
+    const bar = $('toolbar');
+    ORDER.forEach((id, n) => {
+      const d = CATALOG[id];
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'tool'; b.id = 'tool-' + id; b.setAttribute('aria-pressed', 'false');
+      b.innerHTML = `<span class="n">${n + 1}  ${d.short || d.name}</span><span class="c"></span><span class="o"></span>`;
+      b.addEventListener('click', () => selectTool(id));
+      bar.appendChild(b);
+      toolEls[id] = b;
+    });
+    const c = document.createElement('button');
+    c.type = 'button'; c.className = 'tool cancel'; c.id = 'toolCancel'; c.textContent = 'Soltar'; c.hidden = true;
+    c.addEventListener('click', () => { tool = ''; tapPending = false; updateUI(); });
+    bar.appendChild(c);
+  }
+  function selectTool(id) {
+    tool = tool === id ? '' : id;
+    selected = null; tapPending = false;
+    updateUI();
+  }
+  const costText = (cost, short) => Object.keys(cost).map((k) => `${Fmt.num(cost[k])} ${short ? k.slice(0, 3) + '.' : k}`).join(short ? ' · ' : ' + ');
+
+  // ---------- Escena ----------
+  const cv = $('scene'), ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const wc = document.createElement('canvas'); wc.width = W; wc.height = H;
+  const wctx = wc.getContext('2d');
+  const img = wctx.createImageData(W, H);
+  const px32 = new Uint32Array(img.data.buffer);
+  const rgba = (hex, k = 1) => {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.min(255, Math.round(((n >> 16) & 255) * k)), g = Math.min(255, Math.round(((n >> 8) & 255) * k)), b = Math.min(255, Math.round((n & 255) * k));
+    return (255 << 24) | (b << 16) | (g << 8) | r;
+  };
+  const pal = new Uint32Array(16 * 4), palHot = new Uint32Array(16 * 4);
+  for (const d of V.DEFS) for (let s = 0; s < 4; s++) if (d[5].length === 4) { pal[d[0] * 4 + s] = rgba(d[5][s]); palHot[d[0] * 4 + s] = rgba(d[5][s], 1.14); }
+  const cave = ['#1a1219', '#1d141c', '#171016', '#20161f'].map((c) => rgba(c));
+  const sky = new Uint32Array(H);
+  for (let y = 0; y < H; y++) {
+    const t = Math.min(1, y / 62), a = [0x2b, 0x1d, 0x36], b = [0x5a, 0x30, 0x44];
+    const c = a.map((v, k) => Math.round(v + (b[k] - v) * t));
+    sky[y] = (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+  }
+
+  function cellFrom(e) {
+    const r = cv.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - r.left) / r.width) * W), y = Math.floor(((e.clientY - r.top) / r.height) * H);
+    return { x: Math.max(0, Math.min(W - 1, x)), y: Math.max(0, Math.min(H - 1, y)) };
+  }
+  function origin() {
+    const s = CATALOG[tool].size;
+    return { x: hover.x - Math.floor(s[0] / 2), y: hover.y - s[1] + 1 };
+  }
+
+  function render(t) {
+    const w = game.world, mat = w.mat, shade = w.shade, inter = w.interior;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x, m = mat[i];
+        if (m === AIR || m === MACHINE) px32[i] = inter[i] ? cave[shade[i]] : sky[y];
+        else if (m === MAGMA && Math.sin(t * 2.2 + x * 0.44 + y * 0.5) > 0.55) px32[i] = palHot[m * 4 + shade[i]];
+        else px32[i] = pal[m * 4 + shade[i]];
+      }
+    }
+    wctx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(wc, 0, 0, W * PX, H * PX);
+    for (const m of game.machines) m.draw(ctx);
+    const zone = (z, c) => { if (!z) return; ctx.fillStyle = c; ctx.fillRect(z[0] * PX, z[1] * PX, z[2] * PX, z[3] * PX); };
+    if (selected && game.machines.includes(selected)) {
+      zone(selected.zone(game), 'rgba(255,194,92,.28)');
+      ctx.strokeStyle = '#f4e9dd'; ctx.lineWidth = 1;
+      ctx.strokeRect(selected.x * PX - 0.5, selected.y * PX - 0.5, selected.w * PX + 1, selected.h * PX + 1);
+    }
+    if (tool && hover) {
+      const d = CATALOG[tool], o = origin(), ghost = new d.cls(tool, d, o.x, o.y);
+      const why = game.placeProblem(tool, o.x, o.y);
+      const col = why === '' ? '143,214,148' : why === 'No te llega' ? '255,193,92' : '255,107,91';
+      zone(ghost.zone(game), `rgba(${col},.25)`);
+      ctx.fillStyle = `rgba(${col},.35)`;
+      ctx.fillRect(o.x * PX, o.y * PX, ghost.w * PX, ghost.h * PX);
+      ctx.strokeStyle = `rgb(${col})`;
+      ctx.strokeRect(o.x * PX + 0.5, o.y * PX + 0.5, ghost.w * PX - 1, ghost.h * PX - 1);
+    }
+  }
+
+  function tryPlace() {
+    const o = origin(), why = game.placeProblem(tool, o.x, o.y);
+    if (why) { toast(why); return false; }
+    game.place(tool, o.x, o.y);
+    return true;
+  }
+  let downAt = null;
+  cv.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') hover = cellFrom(e); });
+  cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hover = null; });
+  cv.addEventListener('contextmenu', (e) => { e.preventDefault(); tool = ''; selected = null; updateUI(); });
+  cv.addEventListener('pointerup', (e) => {
+    if (e.button === 2 || $('modal').hidden === false) return;
+    if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 12) return; // fue un desplazamiento
+    const c = cellFrom(e);
+    if (e.pointerType === 'mouse') {
+      hover = c;
+      if (tool) tryPlace(); else selected = game.machineAt(c.x, c.y);
+    } else if (tool) {
+      // Táctil: el primer toque enseña dónde va; el segundo, en el mismo sitio, construye.
+      if (tapPending && hover && Math.abs(c.x - hover.x) <= 2 && Math.abs(c.y - hover.y) <= 2) {
+        if (tryPlace()) tapPending = false;
+      } else { hover = c; tapPending = true; }
+    } else {
+      hover = c;
+      selected = game.machineAt(c.x, c.y);
+    }
+    updateUI();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!$('modal').hidden || e.target.tagName === 'INPUT') return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= ORDER.length) selectTool(ORDER[n - 1]);
+    else if (e.key === 'Escape') { tool = ''; selected = null; tapPending = false; updateUI(); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && selected) { game.remove(selected); selected = null; updateUI(); }
+  });
+
+  // ---------- Panel ----------
+  $('zoomBtn').addEventListener('click', askZoom);
+  $('infoBtn1').addEventListener('click', () => {
+    const id = tool || (selected && selected.id);
+    if (id && game.buyUpgrade(id)) toast(`Mejorado: ${CATALOG[id].upgrade.name.toLowerCase()}, nivel ${game.level(id)}`);
+    updateUI();
+  });
+  $('infoBtn2').addEventListener('click', () => { if (selected) { game.remove(selected); selected = null; updateUI(); } });
+
+  function resetIdle() { $('resetRow').innerHTML = '<button class="linklike" id="resetAsk" type="button">Borrar partida</button>'; $('resetAsk').addEventListener('click', resetConfirm); }
+  function resetConfirm() {
+    $('resetRow').innerHTML = '<span class="small">¿Borrar la partida? Se pierde todo, también las escalas.</span> <button class="btn danger" id="resetYes" type="button">Sí, borrar</button> <button class="btn" id="resetNo" type="button">Cancelar</button>';
+    $('resetYes').addEventListener('click', () => { game = new V.Game(); tool = ''; selected = null; save(); resetIdle(); updateUI(); });
+    $('resetNo').addEventListener('click', resetIdle);
+  }
+  $('resetAsk').addEventListener('click', resetConfirm);
+
+  function updateUI() {
+    const w = game.world;
+    $('scale').textContent = `Escala ${game.scaleIdx + 1} · ${game.scaleName()} · 1 celda = ${Fmt.vol(game.cellVolume())}` + (game.knowledge > 1 ? ` · bonus ×${Fmt.sig(game.knowledge)}` : '');
+    $('rObs').textContent = Fmt.num(game.res.obsidiana);
+    $('rBas').textContent = Fmt.num(game.res.basalto);
+    $('rEne').textContent = `${Fmt.num(game.res.energia)} / ${Fmt.num(game.energyCap)}`;
+    $('eBar').style.width = (game.res.energia / game.energyCap * 100).toFixed(1) + '%';
+
+    const dr = game.drained();
+    $('drainTxt').textContent = `${Math.floor(dr * 100)} % · meta ${Math.round(RULES.DRAIN_GOAL * 100)} %`;
+    $('drainBar').style.width = Math.min(100, dr / RULES.DRAIN_GOAL * 100).toFixed(1) + '%';
+    $('magmaTxt').textContent = `Magma en la escena: ${Fmt.num(w.counts[MAGMA])} celdas. Llevas sacado ≈ ${Fmt.fermi(game.totalM3)} (${Fmt.pct(game.totalM3 / V.VESUVIUS_M3 * 100)} del Vesubio).`;
+    $('rateIn').textContent = Fmt.sig(game.rateIn, 2) + '/s';
+    $('rateOut').textContent = Fmt.sig(game.rateOut, 2) + '/s';
+    const chip = $('chip');
+    if (game.rateOut > game.rateIn * 1.05) { chip.textContent = 'El nivel baja'; chip.className = 'chip down'; }
+    else if (game.rateOut < game.rateIn * 0.95) { chip.textContent = 'El magma sube'; chip.className = 'chip up'; }
+    else { chip.textContent = 'Equilibrio: saca más para bajar'; chip.className = 'chip eq'; }
+    const pr = game.pressure / RULES.PRESSURE_MAX;
+    $('pressBar').style.width = (pr * 100).toFixed(1) + '%';
+    $('pressTxt').textContent = pr > 0.3 ? '¡algo tapa la chimenea!' : Math.floor(pr * 100) + ' %';
+    $('zoomBtn').hidden = !game.canZoomOut();
+
+    for (const id of ORDER) {
+      const b = toolEls[id], c = game.buildCost(id);
+      b.setAttribute('aria-pressed', tool === id ? 'true' : 'false');
+      const cEl = b.querySelector('.c');
+      cEl.textContent = costText(c, true);
+      cEl.classList.toggle('no', !game.canAfford(c));
+      b.querySelector('.o').textContent = `Tienes ${game.countOf(id)} · mejora nv ${game.level(id)}`;
+    }
+    $('toolCancel').hidden = !tool;
+    $('tapHint').hidden = !(tool && tapPending);
+    updateInfo();
+    updateHover();
+  }
+
+  function updateInfo() {
+    const id = tool || (selected && selected.id) || '';
+    const b1 = $('infoBtn1'), b2 = $('infoBtn2');
+    if (!id) {
+      if (game.machines.length >= 3) {
+        $('infoTitle').textContent = 'Tu volcán';
+        $('infoBody').innerHTML = '<p>Toca una máquina para ver qué le pasa y mejorarla.</p><p>Para vaciar la grieta tienes que sacar <b>más magma del que entra</b>, cada vez más hondo: las norias y bombas tienen que bajar por la chimenea según baja el nivel.</p><p>No tapes la chimenea: si el magma no puede subir, la presión revienta lo que la tape.</p><p>La <b>dinamita</b> abre roca: haz sitio, encauza el agua o perfora hasta la cámara.</p>';
+      } else {
+        $('infoTitle').textContent = 'Cómo empezar';
+        $('infoBody').innerHTML = '<p>1. Pon un <b>aspersor</b> encima del magma (tecla 1): el agua lo templa en obsidiana y vapor.</p><p>2. Pon un <b>recolector</b> justo encima de la superficie para recoger la obsidiana (2). Si no la recoges, se vuelve a fundir.</p><p>3. Con obsidiana, pon <b>norias</b> en la chimenea para sacar magma (3) y <b>turbinas</b> donde sube el vapor (4).</p><p>El magma no para de entrar. Para vaciar la grieta tienes que sacar más del que entra.</p>';
+      }
+      b1.hidden = true; b2.hidden = true;
+      return;
+    }
+    const d = CATALOG[id], u = d.upgrade, uc = game.upgradeCost(id);
+    b1.hidden = false;
+    b1.innerHTML = `Mejorar: ${u.name}<br><span class="small">${costText(uc)}</span>`;
+    b1.disabled = !game.canAfford(uc);
+    if (selected) {
+      $('infoTitle').textContent = d.name;
+      const state = selected.working() ? '<span class="st-ok">Trabajando</span>' : (selected.status ? `<span class="st-bad">${selected.status}</span>` : 'Esperando');
+      $('infoBody').innerHTML = `<p>${state}</p><p>${d.desc}</p><p>Mejora nivel ${game.level(id)}: ${u.effect}.</p>`;
+      b2.hidden = false;
+      b2.textContent = 'Quitar · devuelve ' + costText(game.refundOf(selected));
+    } else {
+      $('infoTitle').textContent = 'Construir: ' + d.name;
+      let why = '';
+      if (hover) { const o = origin(); why = game.placeProblem(id, o.x, o.y); }
+      $('infoBody').innerHTML = `<p>${d.desc}</p><p>Coste: <b>${costText(game.buildCost(id))}</b>. Mejora nivel ${game.level(id)}: ${u.effect}.</p><p>${why ? `<span class="st-bad">${why}</span>` : 'Toca la escena para colocarla (en el móvil, toca dos veces). Soltar: clic derecho, Esc o el botón «Soltar».'}</p>`;
+      b2.hidden = true;
+    }
+  }
+
+  function updateHover() {
+    if (!hover) { $('hoverInfo').textContent = ''; $('cellInfo').textContent = ''; return; }
+    const m = game.machineAt(hover.x, hover.y);
+    $('hoverInfo').textContent = `(${hover.x}, ${hover.y}) ${m ? CATALOG[m.id].name : V.nameOf(game.world.get(hover.x, hover.y))}`;
+    $('cellInfo').textContent = `1 celda = ${Fmt.vol(game.cellVolume())}`;
+  }
+
+  // ---------- Modo prueba (#prueba) ----------
+  if (/^#(prueba|dev)$/.test(location.hash)) {
+    $('dev').hidden = false;
+    const row = $('speedRow');
+    for (const s of [1, 4, 8]) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn'; b.textContent = 'Tiempo ×' + s;
+      b.addEventListener('click', () => { speed = s; row.querySelectorAll('.btn').forEach((x) => x.classList.toggle('on', x === b)); });
+      if (s === 1) b.classList.add('on');
+      row.appendChild(b);
+    }
+    $('devRes').addEventListener('click', () => { game.res.obsidiana += 500; game.res.basalto += 500; updateUI(); });
+    $('dev8h').addEventListener('click', () => showOffline(8 * 3600));
+    $('devDrain').addEventListener('click', () => {
+      const w = game.world, target = Math.floor(game.magmaStart * 0.08);
+      for (let i = 0; i < w.mat.length && w.counts[MAGMA] > target; i++) if (w.mat[i] === MAGMA) w.set(i, AIR);
+      updateUI();
+    });
+  }
+
+  // ---------- Bucle ----------
+  let last = performance.now(), uiAcc = 0, saveAcc = 0;
+  function frame(now) {
+    const dt = Math.min(0.25, Math.max(0, (now - last) / 1000));
+    last = now;
+    if ($('modal').hidden) game.advance(dt, speed);
+    if (game.events.length) { toast(game.events[game.events.length - 1]); game.events.length = 0; }
+    if (selected && !game.machines.includes(selected)) selected = null;
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').hidden = true; }
+    render(now / 1000);
+    uiAcc += dt; if (uiAcc >= 0.1) { uiAcc = 0; updateUI(); }
+    saveAcc += dt; if (saveAcc >= 5) { saveAcc = 0; save(); }
+    requestAnimationFrame(frame);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); save(); }
+    else if (hiddenAt) {
+      const away = (Date.now() - hiddenAt) / 1000;
+      hiddenAt = 0; last = performance.now();
+      if (away > 60) showOffline(away);
+    }
+  });
+  window.addEventListener('pagehide', save);
+
+  function boot(data) {
+    const d = (data && data.save) || load();
+    game = d ? V.Game.fromDict(d) : new V.Game();
+    buildToolbar();
+    if (d && !(data && data.save)) {
+      const away = (Date.now() - (d.lastSeen || Date.now())) / 1000;
+      if (away > 60) showOffline(away);
+    }
+    updateUI();
+    requestAnimationFrame((t) => { last = t; frame(t); });
+  }
+  const hot = window.claude && window.claude.hot;
+  if (hot && typeof hot.snapshot === 'function') hot.snapshot(() => ({ save: game && game.toDict() }));
+  if (hot && typeof hot.ready === 'function') hot.ready(boot);
+  else boot((hot && hot.data) || {});
+})();
+</script>

@@ -151,6 +151,8 @@ func _initialize() -> void:
 		and absf(back.res["obsidiana"] - g.res["obsidiana"]) < 1e-6
 		and back.world.counts[M.MAGMA] == g.world.counts[M.MAGMA]
 		and back.level("noria") == 1)
+	var back4 := Game.from_dict(JSON.parse_string(JSON.stringify(g4.to_dict(), "", false, true)))
+	check("el guardado conserva la roca abierta con dinamita", back4.world.counts[M.ROCK] == g4.world.counts[M.ROCK] and back4.world.interior == g4.world.interior)
 	var off := back.apply_offline(3600.0)
 	check("fuera ganas a medio ritmo", off["obsidiana"] > 0.0, str(off))
 
