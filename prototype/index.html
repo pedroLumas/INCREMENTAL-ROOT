@@ -25,7 +25,8 @@
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { background: var(--night); color: var(--bone); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+  /* Sin ligaduras: en Pixelify Sans la ligadura "fi" parece una "Á". */
+  body { background: var(--night); color: var(--bone); font-family: var(--font-body); font-size: 15px; line-height: 1.45; font-variant-ligatures: none; font-feature-settings: "liga" 0; }
   .app {
     max-width: 1120px; margin: 0 auto;
     padding-block: 16px 40px;
