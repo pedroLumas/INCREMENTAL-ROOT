@@ -103,3 +103,36 @@ static func dur(seconds: float) -> String:
 	if h > 0:
 		return "%d h %d min" % [h, m]
 	return "%d:%02d" % [m, s % 60]
+
+
+# --- Escala de Fermi (volúmenes aproximados) ---------------------------------
+const VESUVIUS_M3 := PI / 3.0 * 7000.0 * 7000.0 * 1281.0  ## cono simplificado, ≈ 6,57e10 m³
+const FERMI := [
+	[1.5e-5, "una cucharada", "cucharadas"],
+	[2.5e-4, "una taza", "tazas"],
+	[1e-2, "un cubo", "cubos"],
+	[1.5e-1, "una bañera", "bañeras"],
+	[3e1, "un camión cisterna", "camiones cisterna"],
+	[2.5e3, "una piscina olímpica", "piscinas olímpicas"],
+	[2e5, "el dirigible Hindenburg", "Hindenburgs"],
+	[2.6e6, "la Gran Pirámide de Guiza", "Grandes Pirámides"],
+	[7.4e9, "el lago Ness", "lagos Ness"],
+	[VESUVIUS_M3, "el Vesubio entero", "Vesubios"],
+	[8.9e10, "el lago Lemán", "lagos Lemán"],
+	[8.93e11, "el lago Titicaca", "lagos Titicaca"],
+]
+
+
+## "≈ 4,1 lagos Ness", "una bañera", "nada"…
+static func fermi(m3: float) -> String:
+	if not (m3 > 0.0):
+		return "nada"
+	var pick: Array = FERMI[0]
+	for f in FERMI:
+		if m3 >= f[0] * 0.95:
+			pick = f
+	var n: float = m3 / pick[0]
+	if n < 1.5:
+		return ("casi " if n < 0.95 else "") + pick[1]
+	var shown := sig(n, 2) if n < 10.0 else num(roundf(n))
+	return "%s %s" % [shown, pick[2]]

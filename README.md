@@ -1,7 +1,7 @@
 # INCREMENTAL-ROOT
 
-Incremental pixel art 2D: **vaciar un volcán con una cuchara**.
+Incremental pixel art 2D: **vaciar un volcán**, como simulación de materiales (no un clicker).
 
-- [`godot/`](godot/): prototipo principal en Godot 4.5.
-- [`prototype/`](prototype/): la misma versión en HTML/JS, para probar rápido en el móvil.
+- [`godot/`](godot/): el juego, en Godot 4.5. Empieza por [`godot/README.md`](godot/README.md).
+- [`prototype/`](prototype/): primer prototipo en HTML/JS, un clicker. Descartado; se queda como referencia.
 - `.claude/skills/llm-council/`: skill del consejo de 5 asesores usada para elegir el concepto.
